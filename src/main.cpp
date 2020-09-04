@@ -30,24 +30,32 @@ int main(int argc, char* argv[])
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     GLFWwindow* window = glfwCreateWindow(mWidth, mHeight, "Petar's Project", NULL, NULL);
-    
+
     if (window == NULL) {
         cout << "Sorry... Your window failed..." << endl;
         glfwTerminate();
-        return -1;  }
+        return -1;
+    }
 
     glfwMakeContextCurrent(window);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         cout << "Sorry.. GLAD failed you..." << endl;
-        return -1;  }
+        return -1;
+    }
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     float verticies[] = {
         -0.5f, -0.5f, 0.0f,
          0.5f, -0.5f, 0.0f,
-         0.0f,  0.5f, 0.0f
+         0.5f,  0.5f, 0.0f,
+        -0.5f,  0.5f, 0.0f,
+    };
+
+    unsigned int indices[] = {
+        0, 1, 2,
+        0, 2, 3
     };
 
     unsigned int VAO;
@@ -60,9 +68,14 @@ int main(int argc, char* argv[])
     glBufferData(GL_ARRAY_BUFFER, sizeof(verticies), verticies, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+
+    unsigned int EBO;
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
     
-    int success;        // success flag for shader compilation (bellow)
-    char infoLog[512];  // if compile error -> print infoLog
+    int success;      
+    char infoLog[512];
 
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
@@ -109,7 +122,7 @@ int main(int argc, char* argv[])
         glClearColor(0.3f, 0.2f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
