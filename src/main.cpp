@@ -1,12 +1,26 @@
 #include "OpenGLPrj.hpp"
 #include "Shader.h"
+#include "Camera.h"
+
 #include <GLFW/glfw3.h>
+
 #include <cstdlib>
 #include <iostream>
+
 using namespace std;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void mouse_callback(GLFWwindow* window, double xPos, double yPos);
+void scroll_callback(GLFWwindow* window, double xOffset, double yOffset);
 void processInput(GLFWwindow* window);
+
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+float lastX = 0.0f;
+float lastY = 0.0f;
+bool firstMouse = true;
+
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
 
 const char* vertShaderPath = "C:/Users/petar/OpenGLPrj/res/shaders/vert.vert";
 const char* fragShaderPath = "C:/Users/petar/OpenGLPrj/res/shaders/frag.frag";
@@ -20,7 +34,7 @@ int main(int argc, char* argv[])
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
-    GLFWwindow* window = glfwCreateWindow(mWidth, mHeight, "Petar's Project", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(sWidth, sHeight, "Petar's Project", NULL, NULL);
 
     if (window == NULL) {
         cout << "Sorry... Your window failed..." << endl;
@@ -36,6 +50,12 @@ int main(int argc, char* argv[])
     }
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glEnable(GL_DEPTH_TEST);
 
     float verticies[] = {
         -0.5f, -0.5f, 0.0f,     1.0f, 1.0f, 0.0f,    0.0f, 0.0f,
@@ -48,8 +68,6 @@ int main(int argc, char* argv[])
         0, 1, 2,
         0, 2, 3
     };
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     unsigned int VAO;
     glGenVertexArrays(1, &VAO);
@@ -90,12 +108,25 @@ int main(int argc, char* argv[])
         cout << "Failed to load texture..." << endl;
     stbi_image_free(tData);
 
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -5.0f));
+    shader.setMat4("model", model);
+
     while (!glfwWindowShouldClose(window))
     {
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
         processInput(window);
 
         glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)sWidth / (float)sHeight, 0.1f, 100.0f);
+        shader.setMat4("projection", projection);
+        glm::mat4 view = camera.GetViewMatrix();
+        shader.setMat4("view", view);
 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -118,4 +149,37 @@ void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera.ProcessKeyboard(FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera.ProcessKeyboard(BACKWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera.ProcessKeyboard(LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera.ProcessKeyboard(RIGHT, deltaTime);
+}
+
+void mouse_callback(GLFWwindow* window, double xPos, double yPos)
+{
+    if (firstMouse)
+    {
+        lastX = xPos;
+        lastY = yPos;
+        firstMouse = false;
+    }
+
+    float xoffset = xPos - lastX;
+    float yoffset = lastY - yPos; // reversed since y-coordinates go from bottom to top
+
+    lastX = xPos;
+    lastY = yPos;
+
+    camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+void scroll_callback(GLFWwindow* window, double xOffset, double yOffset)
+{
+    camera.ProcessMouseScroll(yOffset);
+    cout << "Scrolling..." << endl;
 }
