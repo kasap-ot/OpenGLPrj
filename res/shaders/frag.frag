@@ -1,13 +1,11 @@
 #version 400 core
 
-in vec3 color;
-in vec2 texCoord;
-
-uniform sampler2D crateTexture;
+uniform vec3 objectColor;
+uniform vec3 lightColor;
 
 out vec4 fragColor;
 
 void main() 
 { 
-    fragColor = texture(crateTexture, texCoord) * vec4(color, 1.0f);
+    fragColor = vec4(lightColor * objectColor, 1.0f);
 };

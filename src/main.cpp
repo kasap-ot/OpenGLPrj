@@ -22,9 +22,13 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-const char* vertShaderPath = "C:/Users/petar/OpenGLPrj/res/shaders/vert.vert";
-const char* fragShaderPath = "C:/Users/petar/OpenGLPrj/res/shaders/frag.frag";
-const char* texturePath = "C:/Users/petar/OpenGLPrj/res/textures/crate.png";
+const char* objectVert = "C:/Users/petar/OpenGLPrj/res/shaders/vert.vert";
+const char* objectFrag = "C:/Users/petar/OpenGLPrj/res/shaders/frag.frag";
+const char* lightVert = "C:/Users/petar/OpenGLPrj/res/shaders/light.vert";
+const char* lightFrag = "C:/Users/petar/OpenGLPrj/res/shaders/light.frag";
+// const char* texturePath = "C:/Users/petar/OpenGLPrj/res/textures/crate.png";
+
+glm::vec3 lightPos(1.5f, 1.5f, 1.5f);
 
 int main(int argc, char* argv[])
 {
@@ -57,32 +61,47 @@ int main(int argc, char* argv[])
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glEnable(GL_DEPTH_TEST);
 
-    float verticies[] = {
-        -0.5f, -0.5f, 0.0f,     1.0f, 1.0f, 0.0f,    0.0f, 0.0f,
-         0.5f, -0.5f, 0.0f,     1.0f, 0.0f, 1.0f,    1.0f, 0.0f,
-         0.5f,  0.5f, 0.0f,     0.0f, 1.0f, 1.0f,    1.0f, 1.0f,
-        -0.5f,  0.5f, 0.0f,     1.0f, 1.0f, 1.0f,    0.0f, 1.0f
+    float vertices[] = {
+        -0.5f, -0.5f,  0.5f,
+        -0.5f,  0.5f,  0.5f,
+        -0.5f,  0.5f, -0.5f,
+        -0.5f, -0.5f, -0.5f,
+
+         0.5f, -0.5f,  0.5f,
+         0.5f,  0.5f,  0.5f,
+         0.5f,  0.5f, -0.5f,
+         0.5f, -0.5f, -0.5f
     };
 
     unsigned int indices[] = {
-        0, 1, 2,
-        0, 2, 3
+        0,1,2,   0,2,3, 
+        0,3,4,   3,4,7, 
+        1,2,5,   2,5,6, 
+        4,5,6,   4,6,7, 
+        0,1,4,   1,4,5, 
+        2,3,6,   3,6,7
     };
 
-    unsigned int VAO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
+    unsigned int objectVAO;
+    glGenVertexArrays(1, &objectVAO);
+    glBindVertexArray(objectVAO);
 
     unsigned int VBO;
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(verticies), verticies, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
+
+    unsigned int lightVAO;
+    glGenVertexArrays(1, &lightVAO);
+    glBindVertexArray(lightVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
     unsigned int EBO;
     glGenBuffers(1, &EBO);
@@ -90,27 +109,8 @@ int main(int argc, char* argv[])
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
     
     // Using absolute paths - change appropriately
-    Shader shader = Shader(vertShaderPath, fragShaderPath);
-    shader.use();
-
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    int tWidth, tHeight, tChannels;
-    unsigned char* tData = stbi_load(texturePath, &tWidth, &tHeight, &tChannels, 0);    
-    if (tData) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tWidth, tHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, tData);
-        glGenerateMipmap(GL_TEXTURE_2D); }
-    else
-        cout << "Failed to load texture..." << endl;
-    stbi_image_free(tData);
-
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -5.0f));
-    shader.setMat4("model", model);
+    Shader objectShader(objectVert, objectFrag);
+    Shader lightShader(lightVert, lightFrag);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -120,21 +120,33 @@ int main(int argc, char* argv[])
 
         processInput(window);
 
-        glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        objectShader.use();
+        objectShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
+        objectShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)sWidth / (float)sHeight, 0.1f, 100.0f);
-        shader.setMat4("projection", projection);
         glm::mat4 view = camera.GetViewMatrix();
-        shader.setMat4("view", view);
+        glm::mat4 model = glm::mat4(1.0f);
+        objectShader.setMat4("projection", projection);
+        objectShader.setMat4("view", view);
+        objectShader.setMat4("model", model);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        lightShader.use();
+        model = glm::translate(model, lightPos);
+        model = glm::scale(model, glm::vec3(0.2f));
+        objectShader.setMat4("projection", projection);
+        objectShader.setMat4("view", view);
+        objectShader.setMat4("model", model);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &VAO);
+    glDeleteVertexArrays(1, &objectVAO);
     glDeleteBuffers(1, &VBO);
 
     glfwTerminate();
@@ -181,5 +193,4 @@ void mouse_callback(GLFWwindow* window, double xPos, double yPos)
 void scroll_callback(GLFWwindow* window, double xOffset, double yOffset)
 {
     camera.ProcessMouseScroll(yOffset);
-    cout << "Scrolling..." << endl;
 }
