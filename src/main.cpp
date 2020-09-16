@@ -130,6 +130,17 @@ int main(int argc, char* argv[])
     Shader objectShader(objectVert, objectFrag);
     Shader lightShader(lightVert, lightFrag);
 
+    objectShader.use();
+
+    objectShader.setVec3("material.ambient", 1.0f, 0.5f, 0.31f);
+    objectShader.setVec3("material.diffuse", 1.0f, 0.5f, 0.31f);
+    objectShader.setVec3("material.specular", 1.0f, 0.5f, 0.31f);
+    objectShader.setFloat("material.shininess", 32.0f);
+
+    objectShader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
+    objectShader.setVec3("light.diffuse", 1.0f, 1.0f, 1.0f);
+    objectShader.setVec3("light.specular", 1.0f, 0.0f, 0.0f);
+
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = glfwGetTime();
@@ -193,12 +204,21 @@ void processInput(GLFWwindow* window)
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        lightPos.z -= 0.001f;
+    else if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        lightPos.z += 0.001f;
+    else if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        lightPos.x -= 0.001f;
+    else if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        lightPos.x += 0.001f;
 }
 
 void mouse_callback(GLFWwindow* window, double xPos, double yPos)
