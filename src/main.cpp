@@ -25,6 +25,14 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+bool switchScene = false;
+
+glm::vec3 lightPosition = glm::vec3(0.0f, 10.0f, 10.0f);
+glm::vec3 lightColor = glm::vec3(300.0f, 300.0f, 300.0f);
+glm::vec3 lightColorStandard = glm::vec3(1.0f, 1.0f, 1.0f);
+glm::vec3 objectColor = glm::vec3(0.5f, 0.0f, 0.0f);
+glm::vec3 wallsColor = glm::vec3(0.8f, 0.8f, 0.8f);
+
 const char* pbrVert         = "C:/Users/petar/OpenGLPrj/res/shaders/pbr.vert";
 const char* pbrFrag         = "C:/Users/petar/OpenGLPrj/res/shaders/pbr.frag";
 const char* backgroundVert  = "C:/Users/petar/OpenGLPrj/res/shaders/background.vert";
@@ -35,6 +43,8 @@ const char* irradianceFrag  = "C:/Users/petar/OpenGLPrj/res/shaders/irradiance_c
 const char* prefilterFrag   = "C:/USers/petar/OpenGLPrj/res/shaders/prefilter.frag";
 const char* brdfVert        = "C:/USers/petar/OpenGLPrj/res/shaders/brdf.vert";
 const char* brdfFrag        = "C:/USers/petar/OpenGLPrj/res/shaders/brdf.frag";
+const char* standardVert    = "C:/USers/petar/OpenGLPrj/res/shaders/standard.vert";
+const char* standardFrag    = "C:/USers/petar/OpenGLPrj/res/shaders/standard.frag";
 
 const char* hdrMapSrc       = "C:/Users/petar/OneDrive/Pictures/skybox/Ditch_River/Ditch-River_2k.hdr";
 
@@ -81,19 +91,22 @@ int main()
     Shader backgroundShader(backgroundVert, backgroundFrag);
     Shader prefilterShader(cubemapVert, prefilterFrag);
     Shader brdfShader(brdfVert, brdfFrag);
+    Shader standardShader(standardVert, standardFrag);
 
     pbrShader.use();
     pbrShader.setInt("irradianceMap", 0);
     pbrShader.setInt("prefilterMap", 1);
     pbrShader.setInt("brdfLUT", 2);
-    pbrShader.setVec3("albedo", 0.5f, 0.0f, 0.0f);
+    pbrShader.setVec3("albedo", objectColor);
     pbrShader.setFloat("ao", 1.0f);
 
     backgroundShader.use();
     backgroundShader.setInt("environmentMap", 0);
 
-    glm::vec3 lightPosition = glm::vec3(0.0f, 10.0f, 10.0f);
-    glm::vec3 lightColor = glm::vec3(300.0f, 300.0f, 300.0f);
+    standardShader.use();
+    standardShader.setVec3("lightPos", lightPosition);
+    standardShader.setVec3("lightColor", lightColorStandard);
+    standardShader.setVec3("objectColor", objectColor);
 
     // pbr: setup framebuffer
     unsigned int captureFBO;
@@ -292,6 +305,7 @@ int main()
     pbrShader.setMat4("projection", projection);
     backgroundShader.use();
     backgroundShader.setMat4("projection", projection);
+    
 
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
     int scrWidth, scrHeight;
@@ -309,48 +323,69 @@ int main()
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // render scene, supplying the convoluted irradiance map to the final shader.
-        pbrShader.use();
-        glm::mat4 view = camera.GetViewMatrix();
-        pbrShader.setMat4("view", view);
-        pbrShader.setVec3("camPos", camera.Position);
+        if (switchScene == false)
+        {
+            // render scene, supplying the convoluted irradiance map to the final shader.
+            pbrShader.use();
+            glm::mat4 view = camera.GetViewMatrix();
+            pbrShader.setMat4("view", view);
+            pbrShader.setVec3("camPos", camera.Position);
 
-        // bind pre-computed IBL data
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+            // bind pre-computed IBL data
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
 
-        // render object
-        glm::mat4 model = glm::mat4(1.0f);
-        pbrShader.setFloat("metallic", 1.0f);
-        pbrShader.setFloat("roughness", glm::clamp(0.025f, 0.05f, 1.0f));
-        pbrShader.setMat4("model", model);
-        renderSphere();
+            // render object
+            glm::mat4 model = glm::mat4(1.0f);
+            pbrShader.setFloat("metallic", 1.0f);
+            pbrShader.setFloat("roughness", glm::clamp(0.025f, 0.05f, 1.0f));
+            pbrShader.setMat4("model", model);
+            renderSphere();
 
-        // render light source
-        pbrShader.setVec3("lightPosition", lightPosition);
-        pbrShader.setVec3("lightColor", lightColor);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, lightPosition);
-        model = glm::scale(model, glm::vec3(0.5f));
-        pbrShader.setMat4("model", model);
-        renderSphere();
+            // render light source
+            pbrShader.setVec3("lightPosition", lightPosition);
+            pbrShader.setVec3("lightColor", lightColor);
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, lightPosition);
+            model = glm::scale(model, glm::vec3(0.5f));
+            pbrShader.setMat4("model", model);
+            renderSphere();
 
-        // render skybox (render as last to prevent overdraw)
-        backgroundShader.use();
-        backgroundShader.setMat4("view", view);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-        //glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap); // display irradiance map
-        //glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);  // display prefilter map
-        renderCube();
+            // render skybox (render as last to prevent overdraw)
+            backgroundShader.use();
+            backgroundShader.setMat4("view", view);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+            renderCube();
+        }
+        else
+        {
+            standardShader.use();
+            standardShader.setVec3("objectColor", objectColor);
+            standardShader.setVec3("lightPos", lightPosition);
+            standardShader.setVec3("viewPos", camera.Position);
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::rotate(model, glm::radians(40.0f * currentFrame), glm::vec3(0.1f, 0.8f, 0.1f));
+            standardShader.setMat4("model", model);
+            standardShader.setMat4("view", camera.GetViewMatrix());
+            standardShader.setMat4("projection", projection);
+            renderCube();
 
-        //brdfShader.use();
-        //renderQuad();
+            model = glm::scale(glm::mat4(1.0f), glm::vec3(7.0f));
+            standardShader.setMat4("model", model);
+            standardShader.setVec3("objectColor", wallsColor);
+            renderCube();
 
+            model = glm::translate(glm::mat4(1.0f), lightPosition);
+            model = glm::scale(model, glm::vec3(0.2f));
+            standardShader.setMat4("model", model);
+            standardShader.setVec3("objectColor", objectColor);
+            renderSphere();
+        }
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         glfwSwapBuffers(window);
@@ -368,12 +403,24 @@ void processInput(GLFWwindow* window)
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
+        switchScene = !switchScene;
+
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        lightPosition.x -= 0.05f;
+    else if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        lightPosition.x += 0.05f;
+    else if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        lightPosition.z += 0.05f;
+    else if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        lightPosition.z -= 0.05f;
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -510,47 +557,47 @@ void renderCube()
     {
         float vertices[] = {
             // back face
-            -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
-             1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-             1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
-             1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-            -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
-            -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
-            // front face
-            -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
-             1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f, // bottom-right
-             1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
-             1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
-            -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f, // top-left
-            -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
-            // left face
-            -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
-            -1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
-            -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
-            -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
-            -1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-right
-            -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
-            // right face
-             1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-             1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
-             1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-             1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-             1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
-            // bottom face
-            -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
-             1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
-             1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
-             1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
-            -1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
-            -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
-            // top face
-            -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
-             1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
-             1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-            -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
-            -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+            -1.0f, -1.0f, -1.0f,    0.0f,  0.0f, -1.0f,    0.0f, 0.0f, // bottom-left
+             1.0f,  1.0f, -1.0f,    0.0f,  0.0f, -1.0f,    1.0f, 1.0f, // top-right
+             1.0f, -1.0f, -1.0f,    0.0f,  0.0f, -1.0f,    1.0f, 0.0f, // bottom-right         
+             1.0f,  1.0f, -1.0f,    0.0f,  0.0f, -1.0f,    1.0f, 1.0f, // top-right
+            -1.0f, -1.0f, -1.0f,    0.0f,  0.0f, -1.0f,    0.0f, 0.0f, // bottom-left
+            -1.0f,  1.0f, -1.0f,    0.0f,  0.0f, -1.0f,    0.0f, 1.0f, // top-left
+            // front face                                 
+            -1.0f, -1.0f,  1.0f,    0.0f,  0.0f,  1.0f,    0.0f, 0.0f, // bottom-left
+             1.0f, -1.0f,  1.0f,    0.0f,  0.0f,  1.0f,    1.0f, 0.0f, // bottom-right
+             1.0f,  1.0f,  1.0f,    0.0f,  0.0f,  1.0f,    1.0f, 1.0f, // top-right
+             1.0f,  1.0f,  1.0f,    0.0f,  0.0f,  1.0f,    1.0f, 1.0f, // top-right
+            -1.0f,  1.0f,  1.0f,    0.0f,  0.0f,  1.0f,    0.0f, 1.0f, // top-left
+            -1.0f, -1.0f,  1.0f,    0.0f,  0.0f,  1.0f,    0.0f, 0.0f, // bottom-left
+            // left face                                  
+            -1.0f,  1.0f,  1.0f,   -1.0f,  0.0f,  0.0f,    1.0f, 0.0f, // top-right
+            -1.0f,  1.0f, -1.0f,   -1.0f,  0.0f,  0.0f,    1.0f, 1.0f, // top-left
+            -1.0f, -1.0f, -1.0f,   -1.0f,  0.0f,  0.0f,    0.0f, 1.0f, // bottom-left
+            -1.0f, -1.0f, -1.0f,   -1.0f,  0.0f,  0.0f,    0.0f, 1.0f, // bottom-left
+            -1.0f, -1.0f,  1.0f,   -1.0f,  0.0f,  0.0f,    0.0f, 0.0f, // bottom-right
+            -1.0f,  1.0f,  1.0f,   -1.0f,  0.0f,  0.0f,    1.0f, 0.0f, // top-right
+            // right face                                 
+             1.0f,  1.0f,  1.0f,    1.0f,  0.0f,  0.0f,    1.0f, 0.0f, // top-left
+             1.0f, -1.0f, -1.0f,    1.0f,  0.0f,  0.0f,    0.0f, 1.0f, // bottom-right
+             1.0f,  1.0f, -1.0f,    1.0f,  0.0f,  0.0f,    1.0f, 1.0f, // top-right         
+             1.0f, -1.0f, -1.0f,    1.0f,  0.0f,  0.0f,    0.0f, 1.0f, // bottom-right
+             1.0f,  1.0f,  1.0f,    1.0f,  0.0f,  0.0f,    1.0f, 0.0f, // top-left
+             1.0f, -1.0f,  1.0f,    1.0f,  0.0f,  0.0f,    0.0f, 0.0f, // bottom-left     
+            // bottom face                                
+            -1.0f, -1.0f, -1.0f,    0.0f, -1.0f,  0.0f,    0.0f, 1.0f, // top-right
+             1.0f, -1.0f, -1.0f,    0.0f, -1.0f,  0.0f,    1.0f, 1.0f, // top-left
+             1.0f, -1.0f,  1.0f,    0.0f, -1.0f,  0.0f,    1.0f, 0.0f, // bottom-left
+             1.0f, -1.0f,  1.0f,    0.0f, -1.0f,  0.0f,    1.0f, 0.0f, // bottom-left
+            -1.0f, -1.0f,  1.0f,    0.0f, -1.0f,  0.0f,    0.0f, 0.0f, // bottom-right
+            -1.0f, -1.0f, -1.0f,    0.0f, -1.0f,  0.0f,    0.0f, 1.0f, // top-right
+            // top face                                   
+            -1.0f,  1.0f, -1.0f,    0.0f,  1.0f,  0.0f,    0.0f, 1.0f, // top-left
+             1.0f,  1.0f , 1.0f,    0.0f,  1.0f,  0.0f,    1.0f, 0.0f, // bottom-right
+             1.0f,  1.0f, -1.0f,    0.0f,  1.0f,  0.0f,    1.0f, 1.0f, // top-right     
+             1.0f,  1.0f,  1.0f,    0.0f,  1.0f,  0.0f,    1.0f, 0.0f, // bottom-right
+            -1.0f,  1.0f, -1.0f,    0.0f,  1.0f,  0.0f,    0.0f, 1.0f, // top-left
+            -1.0f,  1.0f,  1.0f,    0.0f,  1.0f,  0.0f,    0.0f, 0.0f  // bottom-left        
         };
         glGenVertexArrays(1, &cubeVAO);
         glGenBuffers(1, &cubeVBO);
